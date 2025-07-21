@@ -2,9 +2,10 @@ package db
 
 import (
 	"context"
-	"strconv"
+	"fmt"
 	"testing"
 
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,9 +14,9 @@ func TestTransferTx(t *testing.T) {
 
 	account1 := createRandomAccount(t)
 	account2 := createRandomAccount(t)
-
+	fmt.Println(">> before:", account1.Balance, account2.Balance)
 	n := 5
-	amount := int64(10)
+	amount := decimal.NewFromInt(10)
 
 	errs := make(chan error)
 	results := make(chan TransferTxResult)
@@ -31,6 +32,8 @@ func TestTransferTx(t *testing.T) {
 			results <- result
 		}()
 	}
+
+	existed := make(map[int]bool)
 	for i := 0; i < n; i++ {
 		err := <-errs
 		require.NoError(t, err)
@@ -42,7 +45,7 @@ func TestTransferTx(t *testing.T) {
 		require.NotEmpty(t, transfer)
 		require.Equal(t, int64(account1.ID), transfer.FromAccountID)
 		require.Equal(t, int64(account2.ID), transfer.ToAccountID)
-		actualAmount, err := strconv.ParseInt(transfer.Amount, 10, 64)
+		actualAmount := transfer.Amount
 		require.Equal(t, amount, actualAmount)
 		require.NotZero(t, transfer.ID)
 		require.NotZero(t, transfer.CreatedAt)
@@ -53,8 +56,8 @@ func TestTransferTx(t *testing.T) {
 		fromEntry := result.FromEntry
 		require.NotEmpty(t, fromEntry)
 		require.Equal(t, int64(account1.ID), fromEntry.AccountID)
-		actualAmount, err = strconv.ParseInt(fromEntry.Amount, 10, 64)
-		require.Equal(t, -amount, actualAmount)
+		actualAmount = fromEntry.Amount
+		require.Equal(t, amount.Neg(), actualAmount)
 		require.NotZero(t, fromEntry.ID)
 		require.NotZero(t, fromEntry.CreatedAt)
 
@@ -64,7 +67,7 @@ func TestTransferTx(t *testing.T) {
 		toEntry := result.ToEntry
 		require.NotEmpty(t, toEntry)
 		require.Equal(t, int64(account2.ID), toEntry.AccountID)
-		actualAmount, err = strconv.ParseInt(toEntry.Amount, 10, 64)
+		actualAmount = toEntry.Amount
 		require.Equal(t, amount, actualAmount)
 		require.NotZero(t, toEntry.ID)
 		require.NotZero(t, toEntry.CreatedAt)
@@ -72,6 +75,38 @@ func TestTransferTx(t *testing.T) {
 		_, err = store.GetEntryById(context.Background(), toEntry.ID)
 		require.NoError(t, err)
 
-		//TODO: check accounts balance
+		fromAccount := result.FromAccount
+		require.NotEmpty(t, fromAccount)
+		require.Equal(t, account1.ID, fromAccount.ID)
+
+		toAccount := result.ToAccount
+		require.NotEmpty(t, toAccount)
+		require.Equal(t, account2.ID, toAccount.ID)
+		fmt.Println(">> before:", account1.Balance, account2.Balance)
+
+		diff1 := account1.Balance.Sub(fromAccount.Balance)
+		diff2 := toAccount.Balance.Sub(account2.Balance)
+
+		require.Equal(t, diff1, diff2)
+		require.True(t, diff1.Cmp(decimal.NewFromInt(0)) == 1)
+		require.True(t, diff1.Mod(amount).IsZero())
+
+		k := diff1.Div(amount)
+		require.True(t, k.Cmp(decimal.NewFromInt(1)) >= 0 && k.Cmp(decimal.NewFromInt(int64(n))) <= 0)
+		require.NotContains(t, existed, k)
+		existed[int(k.IntPart())] = true
+
 	}
+
+	updateAccount1, err := testQueries.GetAccountById(context.Background(), account1.ID)
+	require.NoError(t, err)
+
+	updateAccount2, err := testQueries.GetAccountById(context.Background(), account2.ID)
+	require.NoError(t, err)
+
+	fmt.Println(">> after:", updateAccount1.Balance, updateAccount2.Balance)
+
+	require.True(t, account1.Balance.Sub(amount.Mul(decimal.NewFromInt(int64(n)))).Equal(updateAccount1.Balance))
+	require.True(t, account2.Balance.Add(amount.Mul(decimal.NewFromInt(int64(n)))).Equal(updateAccount2.Balance))
+
 }

@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strconv"
+
+	"github.com/shopspring/decimal"
 )
 
 // store provides all functions to execute db queries and transactions
@@ -40,9 +41,9 @@ func (store *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 }
 
 type TransferTxParams struct {
-	FromAccountID int64 `json:"from_account_id"`
-	ToAccountID   int64 `json:"to_account_id"`
-	Amount        int64 `json:"amount"`
+	FromAccountID int64           `json:"from_account_id"`
+	ToAccountID   int64           `json:"to_account_id"`
+	Amount        decimal.Decimal `json:"amount"`
 }
 
 type TransferTxResult struct {
@@ -58,10 +59,11 @@ func (store *Store) TransferTx(ctx context.Context, arg TransferTxParams) (Trans
 
 	err := store.execTx(ctx, func(q *Queries) error {
 		var err error
+
 		result.Transfer, err = q.CreateTransfer(ctx, CreateTransferParams{
 			FromAccountID: arg.FromAccountID,
 			ToAccountID:   arg.ToAccountID,
-			Amount:        strconv.FormatInt(arg.Amount, 10),
+			Amount:        arg.Amount,
 		})
 		if err != nil {
 			return err
@@ -69,7 +71,7 @@ func (store *Store) TransferTx(ctx context.Context, arg TransferTxParams) (Trans
 
 		result.FromEntry, err = q.InsertEntry(ctx, InsertEntryParams{
 			AccountID: arg.FromAccountID,
-			Amount:    strconv.FormatInt(-arg.Amount, 10),
+			Amount:    arg.Amount.Neg(),
 		})
 		if err != nil {
 			return err
@@ -77,13 +79,27 @@ func (store *Store) TransferTx(ctx context.Context, arg TransferTxParams) (Trans
 
 		result.ToEntry, err = q.InsertEntry(ctx, InsertEntryParams{
 			AccountID: arg.ToAccountID,
-			Amount:    strconv.FormatInt(arg.Amount, 10),
+			Amount:    arg.Amount,
 		})
 		if err != nil {
 			return err
 		}
 
-		//TODO: update accounts balance
+		result.FromAccount, err = q.AddAccountBalance(ctx, AddAccountBalanceParams{
+			ID:     int32(arg.FromAccountID),
+			Amount: arg.Amount.Neg(),
+		})
+		if err != nil {
+			return err
+		}
+
+		result.ToAccount, err = q.AddAccountBalance(ctx, AddAccountBalanceParams{
+			ID:     int32(arg.ToAccountID),
+			Amount: arg.Amount,
+		})
+		if err != nil {
+			return err
+		}
 
 		return nil
 	})

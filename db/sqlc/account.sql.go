@@ -7,7 +7,34 @@ package db
 
 import (
 	"context"
+
+	"github.com/shopspring/decimal"
 )
+
+const addAccountBalance = `-- name: AddAccountBalance :one
+UPDATE accounts 
+SET balance = balance + $1
+WHERE id = $2
+RETURNING id, owner, balance, currency, created_at
+`
+
+type AddAccountBalanceParams struct {
+	Amount decimal.Decimal `json:"amount"`
+	ID     int32           `json:"id"`
+}
+
+func (q *Queries) AddAccountBalance(ctx context.Context, arg AddAccountBalanceParams) (Account, error) {
+	row := q.db.QueryRowContext(ctx, addAccountBalance, arg.Amount, arg.ID)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.Owner,
+		&i.Balance,
+		&i.Currency,
+		&i.CreatedAt,
+	)
+	return i, err
+}
 
 const createAccount = `-- name: CreateAccount :one
 INSERT INTO accounts (
@@ -20,9 +47,9 @@ INSERT INTO accounts (
 `
 
 type CreateAccountParams struct {
-	Owner    string `json:"owner"`
-	Balance  string `json:"balance"`
-	Currency string `json:"currency"`
+	Owner    string          `json:"owner"`
+	Balance  decimal.Decimal `json:"balance"`
+	Currency string          `json:"currency"`
 }
 
 func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error) {
@@ -55,6 +82,23 @@ SELECT id, owner, balance, currency, created_at FROM accounts WHERE id = $1 LIMI
 
 func (q *Queries) GetAccountById(ctx context.Context, id int32) (Account, error) {
 	row := q.db.QueryRowContext(ctx, getAccountById, id)
+	var i Account
+	err := row.Scan(
+		&i.ID,
+		&i.Owner,
+		&i.Balance,
+		&i.Currency,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getAccountByIdForUpdate = `-- name: GetAccountByIdForUpdate :one
+SELECT id, owner, balance, currency, created_at FROM accounts WHERE id = $1 LIMIT 1 For NO KEY UPDATE
+`
+
+func (q *Queries) GetAccountByIdForUpdate(ctx context.Context, id int32) (Account, error) {
+	row := q.db.QueryRowContext(ctx, getAccountByIdForUpdate, id)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -115,8 +159,8 @@ RETURNING id, owner, balance, currency, created_at
 `
 
 type UpdateAccountParams struct {
-	ID      int32  `json:"id"`
-	Balance string `json:"balance"`
+	ID      int32           `json:"id"`
+	Balance decimal.Decimal `json:"balance"`
 }
 
 func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (Account, error) {

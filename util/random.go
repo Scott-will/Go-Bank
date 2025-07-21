@@ -4,6 +4,8 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 const alphabet = "abcdefghijklmnopqrstuvqxyz"
@@ -32,8 +34,8 @@ func RandomOwner() string {
 	return RandomString(6)
 }
 
-func RandomMoney() int64 {
-	return RandomInt(0, 1000)
+func RandomMoney() decimal.Decimal {
+	return decimal.NewFromInt(RandomInt(0, 1000))
 }
 
 func RandomCurrency() string {

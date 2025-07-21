@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/shopspring/decimal"
 )
 
 const deleteEntry = `-- name: DeleteEntry :exec
@@ -88,8 +90,8 @@ INSERT INTO entries(
 `
 
 type InsertEntryParams struct {
-	AccountID int64  `json:"account_id"`
-	Amount    string `json:"amount"`
+	AccountID int64           `json:"account_id"`
+	Amount    decimal.Decimal `json:"amount"`
 }
 
 func (q *Queries) InsertEntry(ctx context.Context, arg InsertEntryParams) (Entry, error) {
@@ -112,8 +114,8 @@ RETURNING id, account_id, amount, created_at
 `
 
 type UpdateEntryParams struct {
-	Amount string `json:"amount"`
-	ID     int64  `json:"id"`
+	Amount decimal.Decimal `json:"amount"`
+	ID     int64           `json:"id"`
 }
 
 func (q *Queries) UpdateEntry(ctx context.Context, arg UpdateEntryParams) (Entry, error) {

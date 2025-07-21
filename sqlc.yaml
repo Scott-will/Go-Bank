@@ -6,4 +6,10 @@ packages:
     engine: "postgresql"
     path : "./db/sqlc"
     emit_json_tags: true 
-   # sql_package: "database/sql"
+    overrides:
+      - column: "accounts.balance"
+        go_type: "github.com/shopspring/decimal.Decimal"
+      - column: "entries.amount"
+        go_type: "github.com/shopspring/decimal.Decimal"
+      - column: "transfers.amount"
+        go_type: "github.com/shopspring/decimal.Decimal"
