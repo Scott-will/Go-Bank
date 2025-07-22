@@ -14,7 +14,6 @@ func TestTransferTx(t *testing.T) {
 
 	account1 := createRandomAccount(t)
 	account2 := createRandomAccount(t)
-	fmt.Println(">> before:", account1.Balance, account2.Balance)
 	n := 5
 	amount := decimal.NewFromInt(10)
 
@@ -103,9 +102,6 @@ func TestTransferTx(t *testing.T) {
 
 	updateAccount2, err := testQueries.GetAccountById(context.Background(), account2.ID)
 	require.NoError(t, err)
-
-	fmt.Println(">> after:", updateAccount1.Balance, updateAccount2.Balance)
-
 	require.True(t, account1.Balance.Sub(amount.Mul(decimal.NewFromInt(int64(n)))).Equal(updateAccount1.Balance))
 	require.True(t, account2.Balance.Add(amount.Mul(decimal.NewFromInt(int64(n)))).Equal(updateAccount2.Balance))
 
@@ -116,7 +112,6 @@ func TestTransferTxDeadlock(t *testing.T) {
 
 	account1 := createRandomAccount(t)
 	account2 := createRandomAccount(t)
-	fmt.Println(">> before:", account1.Balance, account2.Balance)
 	n := 10
 	amount := decimal.NewFromInt(10)
 
@@ -149,8 +144,6 @@ func TestTransferTxDeadlock(t *testing.T) {
 
 	updateAccount2, err := testQueries.GetAccountById(context.Background(), account2.ID)
 	require.NoError(t, err)
-
-	fmt.Println(">> after:", updateAccount1.Balance, updateAccount2.Balance)
 
 	require.True(t, account1.Balance.Equal(updateAccount1.Balance))
 	require.True(t, account2.Balance.Equal(updateAccount2.Balance))
